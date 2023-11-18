@@ -1,6 +1,7 @@
 (ns pogonos.render
   (:require #?(:cljs [goog.string :as gstr])
             [pogonos.nodes :as nodes]
+            [pogonos.output :as output]
             [pogonos.parse :as parse]
             [pogonos.partials :as partials]
             [pogonos.protocols :as proto]
@@ -69,6 +70,13 @@
              *partials-cache* {}]
      (render* ctx out x))))
 
+(defn- render-to-string
+  [ctx template]
+  (let [out (output/string-output)]
+    (parse/parse (reader/make-string-reader template)
+                 #(render* ctx out %))
+    (out)))
+
 (extend-protocol proto/IRenderable
   #?(:clj Object :cljs object)
   (render [_ _ctx _out])
@@ -104,9 +112,15 @@
             (let [{:keys [open close]} (meta this)
                   ;; the last element of the section body must be SectionEnd,
                   ;; which has to be omitted prior to stringification
-                  body (-> (pop (:nodes this))
-                           (stringify/stringify open close)
-                           val)]
+                  raw-content (-> (pop (:nodes this))
+                                  (stringify/stringify open close))
+                  body (val raw-content)
+                  ;; If the lambda produces a function, it means it's asking for
+                  ;; the rendered content so we call it back with that and
+                  ;; convert the result to string.
+                  body (if (fn? body)
+                         (-> (render-to-string ctx raw-content) body str)
+                         body)]
               (parse/parse (reader/make-string-reader body)
                            #(render* ctx out %)
                            {:open-delim open :close-delim close}))

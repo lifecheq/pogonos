@@ -1,6 +1,6 @@
 (ns pogonos.render-test
   (:require [clojure.string :as str]
-            [clojure.test :refer [deftest are testing]]
+            [clojure.test :refer [deftest is are testing]]
             [pogonos.render :as render]
             [pogonos.nodes :as nodes]
             [pogonos.output :as output]))
@@ -202,3 +202,17 @@
       children:
   - name: bar2
     children:")))
+
+(deftest interpolated-render-test
+  (is (= "880"
+         (render [(nodes/->Section
+                   '(:a)
+                   [(nodes/->Section
+                     '(:half)
+                     [(nodes/->Variable '(:b) false)
+                      (nodes/->SectionEnd '(:half))])
+                    (nodes/->SectionEnd '(:a))])]
+                 {:half (fn [_raw-content]
+                          (fn [rendered-content]
+                            (-> rendered-content parse-long (quot 2))))
+                  :a {:b 1761}}))))
